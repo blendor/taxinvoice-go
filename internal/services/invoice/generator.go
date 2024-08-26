@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/yourusername/tax-invoice-app/internal/models"
-	"github.com/yourusername/tax-invoice-app/pkg/logger"
+	"github.com/blendor/taxinvoice-go/internal/models"
+	"github.com/blendor/taxinvoice-go/pkg/logger"
 )
 
 type Generator struct {
