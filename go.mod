@@ -1,4 +1,4 @@
-module github.com/blendor/TaxInvoice-Go.git
+module github.com/blendor/taxinvoice-go.git
 
 go 1.23.0
 
