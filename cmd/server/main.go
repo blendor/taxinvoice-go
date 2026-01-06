@@ -32,7 +32,11 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", h.Health)
 	mux.HandleFunc("POST /api/v1/calculate-tax", h.CalculateTax)
-	mux.HandleFunc("POST /api/v1/generate-invoice", h.CreateInvoice)
+	mux.HandleFunc("POST /api/v1/invoices", h.CreateInvoice)
+	mux.HandleFunc("GET /api/v1/invoices", h.ListInvoices)
+	mux.HandleFunc("GET /api/v1/invoices/{id}", h.GetInvoice)
+	mux.HandleFunc("PATCH /api/v1/invoices/{id}/pay", h.MarkPaid)
+	mux.HandleFunc("PATCH /api/v1/invoices/{id}/refund", h.MarkRefunded)
 
 	srv := &http.Server{
 		Addr:         ":" + port,

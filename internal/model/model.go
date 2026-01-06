@@ -17,15 +17,25 @@ type TaxRate struct {
 }
 
 type Invoice struct {
-	ID          int64         `json:"id"`
-	CustomerID  int64         `json:"customer_id"`
-	State       string        `json:"state"`
-	Subtotal    float64       `json:"subtotal"`
-	TaxAmount   float64       `json:"tax_amount"`
-	Total       float64       `json:"total"`
-	Items       []InvoiceItem `json:"items"`
-	CreatedAt   time.Time     `json:"created_at"`
+	ID         int64         `json:"id"`
+	CustomerID int64         `json:"customer_id"`
+	State      string        `json:"state"`
+	Subtotal   float64       `json:"subtotal"`
+	TaxAmount  float64       `json:"tax_amount"`
+	Total      float64       `json:"total"`
+	Status     string        `json:"status"`
+	DueDate    time.Time     `json:"due_date"`
+	PaidAt     *time.Time    `json:"paid_at,omitempty"`
+	Items      []InvoiceItem `json:"items,omitempty"`
+	CreatedAt  time.Time     `json:"created_at"`
 }
+
+const (
+	StatusUnpaid   = "unpaid"
+	StatusPaid     = "paid"
+	StatusOverdue  = "overdue"
+	StatusRefunded = "refunded"
+)
 
 type InvoiceItem struct {
 	ProductID int64   `json:"product_id"`

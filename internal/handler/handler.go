@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/blendor/taxinvoice-go/internal/model"
 	"github.com/blendor/taxinvoice-go/internal/service"
@@ -64,6 +65,75 @@ func (h *Handler) CreateInvoice(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 	h.json(w, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) GetInvoice(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		h.error(w, "invalid invoice id", http.StatusBadRequest)
+		return
+	}
+
+	invoice, err := h.svc.GetInvoice(r.Context(), id)
+	if err != nil {
+		h.log.Error("get invoice failed", "error", err)
+		h.error(w, "invoice not found", http.StatusNotFound)
+		return
+	}
+
+	h.json(w, invoice)
+}
+
+func (h *Handler) ListInvoices(w http.ResponseWriter, r *http.Request) {
+	status := r.URL.Query().Get("status")
+	if status != "" && status != model.StatusUnpaid && status != model.StatusPaid &&
+		status != model.StatusOverdue && status != model.StatusRefunded {
+		h.error(w, "invalid status filter", http.StatusBadRequest)
+		return
+	}
+
+	invoices, err := h.svc.ListInvoices(r.Context(), status)
+	if err != nil {
+		h.log.Error("list invoices failed", "error", err)
+		h.error(w, "failed to list invoices", http.StatusInternalServerError)
+		return
+	}
+
+	h.json(w, invoices)
+}
+
+func (h *Handler) MarkPaid(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		h.error(w, "invalid invoice id", http.StatusBadRequest)
+		return
+	}
+
+	invoice, err := h.svc.MarkPaid(r.Context(), id)
+	if err != nil {
+		h.log.Error("mark paid failed", "error", err)
+		h.error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	h.json(w, invoice)
+}
+
+func (h *Handler) MarkRefunded(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	if err != nil {
+		h.error(w, "invalid invoice id", http.StatusBadRequest)
+		return
+	}
+
+	invoice, err := h.svc.MarkRefunded(r.Context(), id)
+	if err != nil {
+		h.log.Error("mark refunded failed", "error", err)
+		h.error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	h.json(w, invoice)
 }
 
 func (h *Handler) json(w http.ResponseWriter, v any) {

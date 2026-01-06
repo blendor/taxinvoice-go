@@ -63,10 +63,15 @@ func (s *Store) CreateInvoice(ctx context.Context, inv *model.Invoice) error {
 	}
 	defer tx.Rollback()
 
+	now := time.Now()
+	inv.CreatedAt = now
+	inv.Status = model.StatusUnpaid
+	inv.DueDate = now.AddDate(0, 0, 30) // Net 30
+
 	err = tx.QueryRowContext(ctx,
-		`INSERT INTO invoices (customer_id, state, subtotal, tax_amount, total, created_at)
-		 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-		inv.CustomerID, inv.State, inv.Subtotal, inv.TaxAmount, inv.Total, time.Now(),
+		`INSERT INTO invoices (customer_id, state, subtotal, tax_amount, total, status, due_date, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+		inv.CustomerID, inv.State, inv.Subtotal, inv.TaxAmount, inv.Total, inv.Status, inv.DueDate, inv.CreatedAt,
 	).Scan(&inv.ID)
 	if err != nil {
 		return err
@@ -84,4 +89,62 @@ func (s *Store) CreateInvoice(ctx context.Context, inv *model.Invoice) error {
 	}
 
 	return tx.Commit()
+}
+
+func (s *Store) GetInvoice(ctx context.Context, id int64) (*model.Invoice, error) {
+	var inv model.Invoice
+	var paidAt sql.NullTime
+	err := s.db.QueryRowContext(ctx,
+		`SELECT id, customer_id, state, subtotal, tax_amount, total, status, due_date, paid_at, created_at
+		 FROM invoices WHERE id = $1`, id,
+	).Scan(&inv.ID, &inv.CustomerID, &inv.State, &inv.Subtotal, &inv.TaxAmount, &inv.Total,
+		&inv.Status, &inv.DueDate, &paidAt, &inv.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	if paidAt.Valid {
+		inv.PaidAt = &paidAt.Time
+	}
+	return &inv, nil
+}
+
+func (s *Store) ListInvoices(ctx context.Context, status string) ([]model.Invoice, error) {
+	query := `SELECT id, customer_id, state, subtotal, tax_amount, total, status, due_date, paid_at, created_at
+			  FROM invoices`
+	args := []any{}
+	if status != "" {
+		query += " WHERE status = $1"
+		args = append(args, status)
+	}
+	query += " ORDER BY created_at DESC"
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var invoices []model.Invoice
+	for rows.Next() {
+		var inv model.Invoice
+		var paidAt sql.NullTime
+		err := rows.Scan(&inv.ID, &inv.CustomerID, &inv.State, &inv.Subtotal, &inv.TaxAmount, &inv.Total,
+			&inv.Status, &inv.DueDate, &paidAt, &inv.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		if paidAt.Valid {
+			inv.PaidAt = &paidAt.Time
+		}
+		invoices = append(invoices, inv)
+	}
+	return invoices, rows.Err()
+}
+
+func (s *Store) UpdateInvoiceStatus(ctx context.Context, id int64, status string, paidAt *time.Time) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE invoices SET status = $1, paid_at = $2 WHERE id = $3`,
+		status, paidAt, id,
+	)
+	return err
 }

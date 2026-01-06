@@ -1,0 +1,5 @@
+DROP INDEX IF EXISTS idx_invoices_status;
+ALTER TABLE invoices
+DROP COLUMN IF EXISTS status,
+DROP COLUMN IF EXISTS due_date,
+DROP COLUMN IF EXISTS paid_at;
