@@ -21,6 +21,6 @@ createdb -U "$DB_USER" "$DB_NAME"
 
 # Run migrations
 echo "Running migrations..."
-migrate -path ./internal/db/migrations -database "postgresql://$DB_USER:$DB_PASSWORD@localhost/$DB_NAME?sslmode=disable" up
+migrate -path ./migrations -database "postgresql://$DB_USER:$DB_PASSWORD@localhost/$DB_NAME?sslmode=disable" up
 
 echo "Database setup completed successfully."

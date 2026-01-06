@@ -1,0 +1,56 @@
+package model
+
+import "time"
+
+type Product struct {
+	ID       int64   `json:"id"`
+	Name     string  `json:"name"`
+	Price    float64 `json:"price"`
+	Category string  `json:"category"`
+}
+
+type TaxRate struct {
+	ID            int64     `json:"id"`
+	State         string    `json:"state"`
+	Rate          float64   `json:"rate"`
+	EffectiveDate time.Time `json:"effective_date"`
+}
+
+type Invoice struct {
+	ID          int64         `json:"id"`
+	CustomerID  int64         `json:"customer_id"`
+	State       string        `json:"state"`
+	Subtotal    float64       `json:"subtotal"`
+	TaxAmount   float64       `json:"tax_amount"`
+	Total       float64       `json:"total"`
+	Items       []InvoiceItem `json:"items"`
+	CreatedAt   time.Time     `json:"created_at"`
+}
+
+type InvoiceItem struct {
+	ProductID int64   `json:"product_id"`
+	Quantity  int     `json:"quantity"`
+	UnitPrice float64 `json:"unit_price"`
+	Subtotal  float64 `json:"subtotal"`
+}
+
+type TaxRequest struct {
+	ProductID int64  `json:"product_id"`
+	Quantity  int    `json:"quantity"`
+	State     string `json:"state"`
+}
+
+type TaxResponse struct {
+	Subtotal  float64 `json:"subtotal"`
+	TaxAmount float64 `json:"tax_amount"`
+	Total     float64 `json:"total"`
+}
+
+type InvoiceRequest struct {
+	CustomerID int64 `json:"customer_id"`
+	State      string `json:"state"`
+	Items      []struct {
+		ProductID int64 `json:"product_id"`
+		Quantity  int   `json:"quantity"`
+	} `json:"items"`
+}

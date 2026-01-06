@@ -2,113 +2,80 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"time"
 
-	"github.com/gorilla/mux"
-	"github.com/blendor/taxinvoice-go/internal/api/handlers"
-	"github.com/blendor/taxinvoice-go/internal/config"
-	"github.com/blendor/taxinvoice-go/internal/db"
-	"github.com/blendor/taxinvoice-go/pkg/logger"
+	"github.com/blendor/taxinvoice-go/internal/handler"
+	"github.com/blendor/taxinvoice-go/internal/service"
+	"github.com/blendor/taxinvoice-go/internal/store"
 )
 
 func main() {
-	// Initialize logger
-	logger := logger.NewLogger()
+	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	// Load configuration
-	cfg, err := config.Load()
+	dbURL := getenv("DATABASE_URL", "postgres://localhost/taxinvoice?sslmode=disable")
+	port := getenv("PORT", "8080")
+
+	db, err := store.New(dbURL)
 	if err != nil {
-		logger.Fatal("Failed to load configuration", "error", err)
+		log.Error("failed to connect to database", "error", err)
+		os.Exit(1)
 	}
+	defer db.Close()
 
-	// Initialize database connection
-	database, err := db.NewPostgresConnection(cfg.DatabaseURL)
-	if err != nil {
-		logger.Fatal("Failed to connect to database", "error", err)
-	}
-	defer database.Close()
+	svc := service.New(db)
+	h := handler.New(svc, log)
 
-	// Initialize router
-	router := mux.NewRouter()
-
-	// Initialize handlers
-	taxHandler := handlers.NewTaxHandler(database, logger)
-	invoiceHandler := handlers.NewInvoiceHandler(database, logger)
-
-	// In main.go, replace the routing setup with:
-	router := mux.NewRouter()
-	api.SetupRoutes(router, taxHandler, invoiceHandler, logger)
-
-	// Set up routes
-	// router.HandleFunc("/api/v1/calculate-tax", taxHandler.CalculateTax).Methods("POST")
-	// router.HandleFunc("/api/v1/generate-invoice", invoiceHandler.GenerateInvoice).Methods("POST")
-
-	// Set up middleware
-	router.Use(loggingMiddleware(logger))
-
-	// Create server
-	// srv := &http.Server{
-	//		Addr:         fmt.Sprintf(":%s", cfg.ServerPort),
-	//		WriteTimeout: time.Second * 15,
-	//		ReadTimeout:  time.Second * 15,
-	//		IdleTimeout:  time.Second * 60,
-	//		Handler:      router,
-	//	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", h.Health)
+	mux.HandleFunc("POST /api/v1/calculate-tax", h.CalculateTax)
+	mux.HandleFunc("POST /api/v1/generate-invoice", h.CreateInvoice)
 
 	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%s", cfg.ServerPort),
-		WriteTimeout: time.Second * 15,
-		ReadTimeout:  time.Second * 15,
-		IdleTimeout:  time.Second * 60,
-		Handler:      router, // Use the router with the set up routes
+		Addr:         ":" + port,
+		Handler:      logging(log, mux),
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
-
-// Create server
-srv := &http.Server{
-    Addr:         fmt.Sprintf(":%s", cfg.ServerPort),
-    WriteTimeout: time.Second * 15,
-    ReadTimeout:  time.Second * 15,
-    IdleTimeout:  time.Second * 60,
-    Handler:      router, // Use the router with the set up routes
-}
-
-	// Start server
 	go func() {
-		logger.Info("Starting server", "port", cfg.ServerPort)
-		if err := srv.ListenAndServe(); err != nil {
-			logger.Error("Server error", "error", err)
+		log.Info("server starting", "port", port)
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+			log.Error("server error", "error", err)
+			os.Exit(1)
 		}
 	}()
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	<-c
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt)
+	<-quit
 
-	// Graceful shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*15)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
+	log.Info("server shutting down")
 	srv.Shutdown(ctx)
-	logger.Info("Server shutting down")
-	os.Exit(0)
 }
 
-func loggingMiddleware(logger *logger.Logger) mux.MiddlewareFunc {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			start := time.Now()
-			next.ServeHTTP(w, r)
-			logger.Info("Request processed",
-				"method", r.Method,
-				"path", r.URL.Path,
-				"duration", time.Since(start),
-			)
-		})
+func getenv(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
 	}
+	return fallback
+}
+
+func logging(log *slog.Logger, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		next.ServeHTTP(w, r)
+		log.Info("request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"duration", time.Since(start),
+		)
+	})
 }
