@@ -144,3 +144,23 @@ func (s *Service) checkOverdue(inv *model.Invoice) {
 		inv.Status = model.StatusOverdue
 	}
 }
+
+func (s *Service) GetTaxReport(ctx context.Context, from, to time.Time) (*model.TaxReport, error) {
+	byState, err := s.store.GetTaxReport(ctx, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tax report: %w", err)
+	}
+
+	var totals model.TaxReportTotals
+	for _, st := range byState {
+		totals.TaxableSales += st.TaxableSales
+		totals.TaxCollected += st.TaxCollected
+		totals.InvoiceCount += st.InvoiceCount
+	}
+
+	return &model.TaxReport{
+		Period:  model.Period{From: from, To: to},
+		ByState: byState,
+		Totals:  totals,
+	}, nil
+}

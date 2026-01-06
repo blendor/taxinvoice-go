@@ -64,3 +64,27 @@ type InvoiceRequest struct {
 		Quantity  int   `json:"quantity"`
 	} `json:"items"`
 }
+
+type TaxReport struct {
+	Period   Period          `json:"period"`
+	ByState  []StateTax      `json:"by_state"`
+	Totals   TaxReportTotals `json:"totals"`
+}
+
+type Period struct {
+	From time.Time `json:"from"`
+	To   time.Time `json:"to"`
+}
+
+type StateTax struct {
+	State        string  `json:"state"`
+	TaxableSales float64 `json:"taxable_sales"`
+	TaxCollected float64 `json:"tax_collected"`
+	InvoiceCount int     `json:"invoice_count"`
+}
+
+type TaxReportTotals struct {
+	TaxableSales float64 `json:"taxable_sales"`
+	TaxCollected float64 `json:"tax_collected"`
+	InvoiceCount int     `json:"invoice_count"`
+}

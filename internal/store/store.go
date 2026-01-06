@@ -148,3 +148,28 @@ func (s *Store) UpdateInvoiceStatus(ctx context.Context, id int64, status string
 	)
 	return err
 }
+
+func (s *Store) GetTaxReport(ctx context.Context, from, to time.Time) ([]model.StateTax, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT state, SUM(subtotal) as taxable_sales, SUM(tax_amount) as tax_collected, COUNT(*) as invoice_count
+		 FROM invoices
+		 WHERE created_at >= $1 AND created_at < $2 AND status != $3
+		 GROUP BY state
+		 ORDER BY tax_collected DESC`,
+		from, to, model.StatusRefunded,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []model.StateTax
+	for rows.Next() {
+		var st model.StateTax
+		if err := rows.Scan(&st.State, &st.TaxableSales, &st.TaxCollected, &st.InvoiceCount); err != nil {
+			return nil, err
+		}
+		results = append(results, st)
+	}
+	return results, rows.Err()
+}

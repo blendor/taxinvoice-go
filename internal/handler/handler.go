@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/blendor/taxinvoice-go/internal/model"
 	"github.com/blendor/taxinvoice-go/internal/service"
@@ -134,6 +135,38 @@ func (h *Handler) MarkRefunded(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.json(w, invoice)
+}
+
+func (h *Handler) TaxReport(w http.ResponseWriter, r *http.Request) {
+	fromStr := r.URL.Query().Get("from")
+	toStr := r.URL.Query().Get("to")
+
+	if fromStr == "" || toStr == "" {
+		h.error(w, "from and to query params required (YYYY-MM-DD)", http.StatusBadRequest)
+		return
+	}
+
+	from, err := time.Parse("2006-01-02", fromStr)
+	if err != nil {
+		h.error(w, "invalid from date format (use YYYY-MM-DD)", http.StatusBadRequest)
+		return
+	}
+
+	to, err := time.Parse("2006-01-02", toStr)
+	if err != nil {
+		h.error(w, "invalid to date format (use YYYY-MM-DD)", http.StatusBadRequest)
+		return
+	}
+	to = to.AddDate(0, 0, 1) // Include the entire "to" day
+
+	report, err := h.svc.GetTaxReport(r.Context(), from, to)
+	if err != nil {
+		h.log.Error("tax report failed", "error", err)
+		h.error(w, "failed to generate tax report", http.StatusInternalServerError)
+		return
+	}
+
+	h.json(w, report)
 }
 
 func (h *Handler) json(w http.ResponseWriter, v any) {
