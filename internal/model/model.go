@@ -88,3 +88,21 @@ type TaxReportTotals struct {
 	TaxCollected float64 `json:"tax_collected"`
 	InvoiceCount int     `json:"invoice_count"`
 }
+
+type AgingReport struct {
+	AsOf    time.Time    `json:"as_of"`
+	Buckets []AgingBucket `json:"buckets"`
+	Total   AgingTotal   `json:"total"`
+}
+
+type AgingBucket struct {
+	Label        string    `json:"label"` // "current", "1-30", "31-60", "61-90", "90+"
+	InvoiceCount int       `json:"invoice_count"`
+	Amount       float64   `json:"amount"`
+	Invoices     []Invoice `json:"invoices,omitempty"`
+}
+
+type AgingTotal struct {
+	InvoiceCount int     `json:"invoice_count"`
+	Amount       float64 `json:"amount"`
+}

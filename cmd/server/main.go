@@ -38,6 +38,7 @@ func main() {
 	mux.HandleFunc("PATCH /api/v1/invoices/{id}/pay", h.MarkPaid)
 	mux.HandleFunc("PATCH /api/v1/invoices/{id}/refund", h.MarkRefunded)
 	mux.HandleFunc("GET /api/v1/reports/tax", h.TaxReport)
+	mux.HandleFunc("GET /api/v1/reports/aging", h.AgingReport)
 
 	srv := &http.Server{
 		Addr:         ":" + port,

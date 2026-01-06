@@ -169,6 +169,19 @@ func (h *Handler) TaxReport(w http.ResponseWriter, r *http.Request) {
 	h.json(w, report)
 }
 
+func (h *Handler) AgingReport(w http.ResponseWriter, r *http.Request) {
+	includeInvoices := r.URL.Query().Get("details") == "true"
+
+	report, err := h.svc.GetAgingReport(r.Context(), includeInvoices)
+	if err != nil {
+		h.log.Error("aging report failed", "error", err)
+		h.error(w, "failed to generate aging report", http.StatusInternalServerError)
+		return
+	}
+
+	h.json(w, report)
+}
+
 func (h *Handler) json(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)

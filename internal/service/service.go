@@ -164,3 +164,54 @@ func (s *Service) GetTaxReport(ctx context.Context, from, to time.Time) (*model.
 		Totals:  totals,
 	}, nil
 }
+
+func (s *Service) GetAgingReport(ctx context.Context, includeInvoices bool) (*model.AgingReport, error) {
+	invoices, err := s.store.GetUnpaidInvoices(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get unpaid invoices: %w", err)
+	}
+
+	now := time.Now()
+	buckets := []model.AgingBucket{
+		{Label: "current"},
+		{Label: "1-30"},
+		{Label: "31-60"},
+		{Label: "61-90"},
+		{Label: "90+"},
+	}
+
+	for _, inv := range invoices {
+		daysOverdue := int(now.Sub(inv.DueDate).Hours() / 24)
+		var idx int
+		switch {
+		case daysOverdue <= 0:
+			idx = 0 // current
+		case daysOverdue <= 30:
+			idx = 1 // 1-30
+		case daysOverdue <= 60:
+			idx = 2 // 31-60
+		case daysOverdue <= 90:
+			idx = 3 // 61-90
+		default:
+			idx = 4 // 90+
+		}
+
+		buckets[idx].InvoiceCount++
+		buckets[idx].Amount += inv.Total
+		if includeInvoices {
+			buckets[idx].Invoices = append(buckets[idx].Invoices, inv)
+		}
+	}
+
+	var total model.AgingTotal
+	for _, b := range buckets {
+		total.InvoiceCount += b.InvoiceCount
+		total.Amount += b.Amount
+	}
+
+	return &model.AgingReport{
+		AsOf:    now,
+		Buckets: buckets,
+		Total:   total,
+	}, nil
+}

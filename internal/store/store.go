@@ -173,3 +173,33 @@ func (s *Store) GetTaxReport(ctx context.Context, from, to time.Time) ([]model.S
 	}
 	return results, rows.Err()
 }
+
+func (s *Store) GetUnpaidInvoices(ctx context.Context) ([]model.Invoice, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, customer_id, state, subtotal, tax_amount, total, status, due_date, paid_at, created_at
+		 FROM invoices
+		 WHERE status = $1
+		 ORDER BY due_date ASC`,
+		model.StatusUnpaid,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var invoices []model.Invoice
+	for rows.Next() {
+		var inv model.Invoice
+		var paidAt sql.NullTime
+		err := rows.Scan(&inv.ID, &inv.CustomerID, &inv.State, &inv.Subtotal, &inv.TaxAmount, &inv.Total,
+			&inv.Status, &inv.DueDate, &paidAt, &inv.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		if paidAt.Valid {
+			inv.PaidAt = &paidAt.Time
+		}
+		invoices = append(invoices, inv)
+	}
+	return invoices, rows.Err()
+}
